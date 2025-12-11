@@ -1,5 +1,22 @@
+import matplotlib.pyplot as plt
 
-# Test for git# mission_simulator.py
+def plot_milp_output(milp_result, ugv_candidates, beacon_candidates):
+    plt.figure(figsize=(8,8))
+    plt.scatter(ugv_candidates[:,0], ugv_candidates[:,1], c='lightblue', s=20, label='UGV candidates')
+    plt.scatter(beacon_candidates[:,0], beacon_candidates[:,1], c='lightgreen', s=20, label='Beacon candidates')
+    for i in milp_result['selected_ugvs']:
+        plt.scatter(ugv_candidates[i,0], ugv_candidates[i,1], c='blue', s=100, edgecolor='k', label='Selected UGV')
+    for j in milp_result['selected_beacons']:
+        plt.scatter(beacon_candidates[j,0], beacon_candidates[j,1], c='green', marker='^', s=100, edgecolor='k', label='Selected Beacon')
+    plt.title('MILP Output: Selected Support Nodes')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# Test for git
+# # mission_simulator.py
 import numpy as np
 import matplotlib.pyplot as plt
 from pulp import (LpProblem, LpVariable, LpMinimize, lpSum,

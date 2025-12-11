@@ -69,7 +69,10 @@ def get_simulation_constants(density_factor=1.50):
         "MIN_UAV": 5,
         "BATTERY_CAPACITY": 3283200,
         "BATTERY_RESERVE_FRACTION": 0.6,
+        "BATTERY_RESERVE_MISSION": 0.5, # Reserve for mission simulation
         "AVERAGE_FLIGHT_POWER": 3033,
+        "MONTE_CARLO_RUNS": 5,
+        "GRID_SPACING": 100.0,
     }
 
 
