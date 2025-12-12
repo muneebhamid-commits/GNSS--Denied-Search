@@ -45,6 +45,7 @@ def evaluate_solution_cost(constants, ugv_indices, beacon_indices, ugv_candidate
         avg_time /= n_monte_carlo
         avg_energy /= n_monte_carlo
         
+        # 80% Success Rule
         if success_count >= (n_monte_carlo * 0.8):
             # Calculate Cost
             cost_uav_base = n_uavs * constants["UAV_COST"]
@@ -115,59 +116,66 @@ def vns_pipeline(constants, milp_result, ugv_candidates, beacon_candidates):
         print(f"\n--- VNS Iteration {iteration + 1}/{max_iterations} ---")
         improved = False
         
-        # --- Neighborhood 1: SWAP ---
-        # Swap 1 selected with 1 unselected (Global Swap)
-        print("  > Neighborhood 1: Swap")
-        # Try k random swaps
-        k_swaps = 3
-        for _ in range(k_swaps):
-            # Decide to swap UGV or Beacon
-            if random.random() < 0.5 and len(current_ugv_indices) > 0:
-                # Swap UGV
-                u_remove = random.choice(list(current_ugv_indices))
-                available = list(all_ugv_indices - current_ugv_indices)
-                if not available: continue
-                u_add = random.choice(available)
-                
-                new_ugv = copy.deepcopy(current_ugv_indices)
-                new_ugv.remove(u_remove)
-                new_ugv.add(u_add)
-                
-                cost, details = evaluate_solution_cost(constants, new_ugv, current_beacon_indices, ugv_candidates, beacon_candidates)
-                if cost < current_cost:
-                    print(f"    Found Better Swap! Cost: ${cost:,.2f}")
-                    current_cost = cost
-                    current_ugv_indices = new_ugv
-                    current_details = details
-                    improved = True
-                    break
-            elif len(current_beacon_indices) > 0:
-                # Swap Beacon
-                b_remove = random.choice(list(current_beacon_indices))
-                available = list(all_beacon_indices - current_beacon_indices)
-                if not available: continue
-                b_add = random.choice(available)
-                
-                new_beacon = copy.deepcopy(current_beacon_indices)
-                new_beacon.remove(b_remove)
-                new_beacon.add(b_add)
-                
-                cost, details = evaluate_solution_cost(constants, current_ugv_indices, new_beacon, ugv_candidates, beacon_candidates)
-                if cost < current_cost:
-                    print(f"    Found Better Swap! Cost: ${cost:,.2f}")
-                    current_cost = cost
-                    current_beacon_indices = new_beacon
-                    current_details = details
-                    improved = True
-                    break
+        # --- Neighborhood 1: SWAP (Intensification) ---
+        # Keep swapping as long as it is finding better solutions
+        print("  > Neighborhood 1: Swap (Intensification)")
+        while True:
+            swap_improved = False
+            k_swaps = 3
+            for _ in range(k_swaps):
+                # Decide to swap UGV or Beacon
+                if random.random() < 0.5 and len(current_ugv_indices) > 0:
+                    # Swap UGV
+                    u_remove = random.choice(list(current_ugv_indices))
+                    available = list(all_ugv_indices - current_ugv_indices)
+                    if not available: continue
+                    u_add = random.choice(available)
+                    
+                    new_ugv = copy.deepcopy(current_ugv_indices)
+                    new_ugv.remove(u_remove)
+                    new_ugv.add(u_add)
+                    
+                    cost, details = evaluate_solution_cost(constants, new_ugv, current_beacon_indices, ugv_candidates, beacon_candidates)
+                    if cost < current_cost:
+                        print(f"    Found Better Swap! Cost: ${cost:,.2f}")
+                        current_cost = cost
+                        current_ugv_indices = new_ugv
+                        current_details = details
+                        swap_improved = True
+                        improved = True
+                        break # Break k_swaps loop to restart while loop
+                elif len(current_beacon_indices) > 0:
+                    # Swap Beacon
+                    b_remove = random.choice(list(current_beacon_indices))
+                    available = list(all_beacon_indices - current_beacon_indices)
+                    if not available: continue
+                    b_add = random.choice(available)
+                    
+                    new_beacon = copy.deepcopy(current_beacon_indices)
+                    new_beacon.remove(b_remove)
+                    new_beacon.add(b_add)
+                    
+                    cost, details = evaluate_solution_cost(constants, current_ugv_indices, new_beacon, ugv_candidates, beacon_candidates)
+                    if cost < current_cost:
+                        print(f"    Found Better Swap! Cost: ${cost:,.2f}")
+                        current_cost = cost
+                        current_beacon_indices = new_beacon
+                        current_details = details
+                        swap_improved = True
+                        improved = True
+                        break # Break k_swaps loop to restart while loop
+            
+            if not swap_improved:
+                break # Stop swapping if no improvement in this batch
         
+        # Update best if improved during swap
         if improved:
             if current_cost < best_cost:
                 best_cost = current_cost
                 best_ugv_indices = copy.deepcopy(current_ugv_indices)
                 best_beacon_indices = copy.deepcopy(current_beacon_indices)
                 best_details = current_details
-            continue # Restart neighborhoods
+            # Do NOT continue here. Fall through to Shift/Shake if Swap is exhausted.
             
         # --- Neighborhood 2: SHIFT ---
         # Move a selected node to a nearby unselected node (Local Search)
@@ -361,14 +369,14 @@ def vns_pipeline(constants, milp_result, ugv_candidates, beacon_candidates):
         
         # Save VNS Result
         result = {
-            "selected_ugvs": list(best_ugv_indices),
-            "selected_beacons": list(best_beacon_indices),
-            "num_uavs": best_details['n_uavs'],
-            "cost": best_cost,
-            "time": t,
-            "energy": e,
-            "success": success,
-            "seed": showcase_seed
+            "selected_ugvs": [int(x) for x in best_ugv_indices],
+            "selected_beacons": [int(x) for x in best_beacon_indices],
+            "num_uavs": int(best_details['n_uavs']),
+            "cost": float(best_cost),
+            "time": float(t),
+            "energy": float(e),
+            "success": bool(success),
+            "seed": int(showcase_seed)
         }
         with open("vns_result.json", "w") as f:
             json.dump(result, f, indent=4)

@@ -1,0 +1,15 @@
+{
+    "selected_ugvs": [
+        377,
+        458,
+        976,
+        997
+    ],
+    "selected_beacons": [
+        114,
+        161
+    ],
+    "num_uavs": 5,
+    "total_cost": 13200.0,
+    "status": 1
+}

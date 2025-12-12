@@ -1,10 +1,18 @@
 {
     "selected_ugvs": [
         377,
-        997,
-        430,
-        1189
+        458,
+        1372,
+        1341
     ],
     "selected_beacons": [
-        78,
-        
+        146,
+        94
+    ],
+    "num_uavs": 7,
+    "cost": 97944.50361722222,
+    "time": 100.0,
+    "energy": 136685178.0,
+    "success": false,
+    "seed": 3694
+}

@@ -1,20 +1,8 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial import cKDTree
 import math
 import pulp
-
-def plot_candidates(candidates, title='Candidate Generation Output'):
-    plt.figure(figsize=(8,8))
-    plt.scatter(candidates[:,0], candidates[:,1], c='orange', s=20)
-    plt.title(title)
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.grid(True)
-    plt.show()
-
 # Test for git
 # ------------------------------------------------------------
 # IMPROVED Poisson-Disk Sampling

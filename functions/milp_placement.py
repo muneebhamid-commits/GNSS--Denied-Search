@@ -1,28 +1,7 @@
-import matplotlib.pyplot as plt
-
-def plot_milp_output(milp_result, ugv_candidates, beacon_candidates):
-    plt.figure(figsize=(8,8))
-    plt.scatter(ugv_candidates[:,0], ugv_candidates[:,1], c='lightblue', s=20, label='UGV candidates')
-    plt.scatter(beacon_candidates[:,0], beacon_candidates[:,1], c='lightgreen', s=20, label='Beacon candidates')
-    for i in milp_result['selected_ugvs']:
-        plt.scatter(ugv_candidates[i,0], ugv_candidates[i,1], c='blue', s=100, edgecolor='k', label='Selected UGV')
-    for j in milp_result['selected_beacons']:
-        plt.scatter(beacon_candidates[j,0], beacon_candidates[j,1], c='green', marker='^', s=100, edgecolor='k', label='Selected Beacon')
-    plt.title('MILP Output: Selected Support Nodes')
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-# Test for git
-# # mission_simulator.py
+import json
 import numpy as np
+from pulp import LpProblem, LpVariable, LpBinary, LpMinimize, lpSum, PULP_CBC_CMD, value
 import matplotlib.pyplot as plt
-from pulp import (LpProblem, LpVariable, LpMinimize, lpSum,
-                  LpBinary, LpInteger, value, PULP_CBC_CMD)
-
-
 def solve_milp(params, ugv_valid, beacon_valid, uav_vars, plot=True, time_limit=120):
     """
     MILP solver with drift-aware coverage (Option A).
@@ -365,10 +344,16 @@ def solve_milp(params, ugv_valid, beacon_valid, uav_vars, plot=True, time_limit=
     # ---------------------------
     # Return
     # ---------------------------
-    return {
+    result = {
         "selected_ugvs": selected_ugvs,
         "selected_beacons": selected_beacons,
         "num_uavs": num_uavs,
         "total_cost": total_cost,
         "status": status
     }
+    
+    # Save to JSON
+    with open("milp_result.json", "w") as f:
+        json.dump(result, f, indent=4)
+        
+    return result
