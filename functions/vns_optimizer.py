@@ -115,6 +115,7 @@ def vns_pipeline(constants, milp_result, ugv_candidates, beacon_candidates):
     for iteration in range(max_iterations):
         print(f"\n--- VNS Iteration {iteration + 1}/{max_iterations} ---")
         improved = False
+        improved_in_swap = False
         
         # --- Neighborhood 1: SWAP (Intensification) ---
         # Keep swapping as long as it is finding better solutions
@@ -143,6 +144,7 @@ def vns_pipeline(constants, milp_result, ugv_candidates, beacon_candidates):
                         current_details = details
                         swap_improved = True
                         improved = True
+                        improved_in_swap = True
                         break # Break k_swaps loop to restart while loop
                 elif len(current_beacon_indices) > 0:
                     # Swap Beacon
@@ -163,6 +165,7 @@ def vns_pipeline(constants, milp_result, ugv_candidates, beacon_candidates):
                         current_details = details
                         swap_improved = True
                         improved = True
+                        improved_in_swap = True
                         break # Break k_swaps loop to restart while loop
             
             if not swap_improved:
@@ -175,7 +178,11 @@ def vns_pipeline(constants, milp_result, ugv_candidates, beacon_candidates):
                 best_ugv_indices = copy.deepcopy(current_ugv_indices)
                 best_beacon_indices = copy.deepcopy(current_beacon_indices)
                 best_details = current_details
-            # Do NOT continue here. Fall through to Shift/Shake if Swap is exhausted.
+            
+            # If we improved in swap, we skip the rest and go to next iteration (restart VNS loop)
+            if improved_in_swap:
+                print("    Swap improved solution. Restarting VNS iteration.")
+                continue
             
         # --- Neighborhood 2: SHIFT ---
         # Move a selected node to a nearby unselected node (Local Search)
@@ -384,28 +391,65 @@ def vns_pipeline(constants, milp_result, ugv_candidates, beacon_candidates):
         # --- PLOTTING ---
         area_side = constants["AREA"]
         
-        # Figure 1: Final Solution Map
-        fig1, ax1 = plt.subplots(figsize=(10, 10))
-        ax1.set_title(f"Final VNS Solution (Cost: ${best_cost:,.0f})")
-        ax1.set_xlim(0, area_side)
-        ax1.set_ylim(0, area_side)
+        # Figure 1: Final Solution Map (3 Subplots like MILP)
+        fig1, axs = plt.subplots(1, 3, figsize=(18, 6))
+        fig1.suptitle(f"Final VNS Solution (Cost: ${best_cost:,.0f})", fontsize=16)
         
-        # Candidates (faint)
-        ax1.scatter(ugv_candidates[:, 0], ugv_candidates[:, 1], c='lightblue', s=10, alpha=0.3)
-        ax1.scatter(beacon_candidates[:, 0], beacon_candidates[:, 1], c='lightgreen', s=10, alpha=0.3)
+        # Common params
+        R_drift = (constants["UAV_MIN_SPEED"] * 60.0 * constants["DRIFT_TOLERANCE"] / constants["DRIFT_RATE"])
+        R_ugv = R_drift + constants["COVERAGE_RADIUS_UGV"]
+        R_beacon = R_drift + constants["COVERAGE_RADIUS_BEACON"]
         
-        # Selected
-        if len(ugv_locs) > 0:
-            ax1.scatter(ugv_locs[:, 0], ugv_locs[:, 1], c='blue', s=100, label='UGV', edgecolors='k')
-            for u in ugv_locs:
-                ax1.add_patch(plt.Circle((u[0], u[1]), constants["COVERAGE_RADIUS_UGV"], color='blue', fill=False, linestyle='--', alpha=0.3))
+        # --- Subplot 1: Drift Radius ---
+        axs[0].set_title(f"Drift Correction Zones (R_drift={R_drift:.1f} m)")
+        axs[0].set_xlim(0, area_side)
+        axs[0].set_ylim(0, area_side)
         
-        if len(beacon_locs) > 0:
-            ax1.scatter(beacon_locs[:, 0], beacon_locs[:, 1], c='green', s=100, marker='^', label='Beacon', edgecolors='k')
-            for b in beacon_locs:
-                ax1.add_patch(plt.Circle((b[0], b[1]), constants["COVERAGE_RADIUS_BEACON"], color='green', fill=False, linestyle='--', alpha=0.3))
-                
-        ax1.legend()
+        if len(ugv_candidates) > 0:
+            axs[0].scatter(ugv_candidates[:, 0], ugv_candidates[:, 1], c='lightblue', s=20, alpha=0.5, label='UGV cand')
+        if len(beacon_candidates) > 0:
+            axs[0].scatter(beacon_candidates[:, 0], beacon_candidates[:, 1], c='lightgreen', s=20, alpha=0.5, label='Beacon cand')
+            
+        for u in ugv_locs:
+            axs[0].scatter(u[0], u[1], c='blue', s=100, edgecolor='k')
+            axs[0].add_patch(plt.Circle((u[0], u[1]), R_ugv, color='blue', alpha=0.18))
+            
+        for b in beacon_locs:
+            axs[0].scatter(b[0], b[1], c='green', marker='^', s=100, edgecolor='k')
+            axs[0].add_patch(plt.Circle((b[0], b[1]), R_beacon, color='green', alpha=0.18))
+            
+        # --- Subplot 2: Coverage Radius ---
+        axs[1].set_title("Coverage Zones (UGV vs Beacon)")
+        axs[1].set_xlim(0, area_side)
+        axs[1].set_ylim(0, area_side)
+        
+        if len(ugv_candidates) > 0:
+            axs[1].scatter(ugv_candidates[:, 0], ugv_candidates[:, 1], c='lightblue', s=20, alpha=0.5)
+        if len(beacon_candidates) > 0:
+            axs[1].scatter(beacon_candidates[:, 0], beacon_candidates[:, 1], c='lightgreen', s=20, alpha=0.5)
+            
+        for u in ugv_locs:
+            axs[1].scatter(u[0], u[1], c='blue', s=100, edgecolor='k')
+            axs[1].add_patch(plt.Circle((u[0], u[1]), constants["COVERAGE_RADIUS_UGV"], color='blue', fill=False, alpha=0.22, linestyle='--', linewidth=2))
+            
+        for b in beacon_locs:
+            axs[1].scatter(b[0], b[1], c='green', marker='^', s=100, edgecolor='k')
+            axs[1].add_patch(plt.Circle((b[0], b[1]), constants["COVERAGE_RADIUS_BEACON"], color='green', fill=False, alpha=0.22, linestyle='--', linewidth=2))
+            
+        # --- Subplot 3: Battery Swap Range ---
+        BATTERY_SAFE_RANGE = (1 - constants["BATTERY_RESERVE_FRACTION"]) * constants["BATTERY_CAPACITY"] * constants["UAV_MIN_SPEED"] / constants["AVERAGE_FLIGHT_POWER"]
+        axs[2].set_title(f"Battery Swap Range (radius={BATTERY_SAFE_RANGE:.0f} m)")
+        axs[2].set_xlim(0, area_side)
+        axs[2].set_ylim(0, area_side)
+        
+        if len(ugv_candidates) > 0:
+            axs[2].scatter(ugv_candidates[:, 0], ugv_candidates[:, 1], c='lightblue', s=20, alpha=0.5)
+            
+        for u in ugv_locs:
+            axs[2].scatter(u[0], u[1], c='blue', s=100, edgecolor='k')
+            axs[2].add_patch(plt.Circle((u[0], u[1]), BATTERY_SAFE_RANGE, color='purple', alpha=0.18))
+            
+        plt.tight_layout()
         plt.savefig("vns_solution_map.png")
         
         # Figure 2: Coverage Heatmap

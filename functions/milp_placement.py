@@ -339,6 +339,7 @@ def solve_milp(params, ugv_valid, beacon_valid, uav_vars, plot=True, time_limit=
         axs[2].legend(loc='upper right', fontsize=9)
 
         plt.tight_layout()
+        plt.savefig("milp_solution.png") # Save the plot
         plt.show()
 
     # ---------------------------

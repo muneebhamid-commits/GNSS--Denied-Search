@@ -110,6 +110,7 @@ def generate_and_filter_candidates_vectorized(params, plot_results=True):
 
     if plot_results:
         plot_candidates_vectorized(area_side, ugv_raw, beacon_raw, ugv_valid, beacon_valid, margin, coverage_radius_ugv, coverage_radius_beacon, params)
+        plt.savefig("candidates_generated.png") # Save the plot
 
     return ugv_valid, beacon_valid
 

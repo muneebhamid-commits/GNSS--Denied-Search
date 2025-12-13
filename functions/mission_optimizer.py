@@ -73,7 +73,8 @@ def run_cvt_simulation(num_uavs, constants, ugv_locs, beacon_locs, max_time_min=
         "avg_drift": [],
         "max_drift": [],
         "battery_levels": [],
-        "coverage_pct": []
+        "coverage_pct": [],
+        "grid_confidence": [] # Store confidence maps for animation/heatmap
     } if record_history else None
     
     # Animation frames
@@ -93,7 +94,7 @@ def run_cvt_simulation(num_uavs, constants, ugv_locs, beacon_locs, max_time_min=
             frames.append({
                 "uav_pos": uav_pos.copy(),
                 "uav_state": uav_state.copy(),
-                "covered_mask": covered_mask.copy(),
+                "grid_confidence": grid_confidence.copy(), # Save confidence for coloring
                 "time": current_time
             })
 
@@ -292,12 +293,14 @@ def run_cvt_simulation(num_uavs, constants, ugv_locs, beacon_locs, max_time_min=
                 detection_prob = max(0.0, 1.0 - drift_pct)
                 
                 # Update confidence: P_new = 1 - (1 - P_old) * (1 - P_det)
-                # We only update points that are not yet fully covered to save time?
-                # No, update all in range.
-                
+                # Bayesian Update
                 current_conf = grid_confidence[in_range_indices]
                 new_conf = 1.0 - (1.0 - current_conf) * (1.0 - detection_prob)
                 grid_confidence[in_range_indices] = new_conf
+                
+        # Update covered mask
+        covered_mask = grid_confidence >= 0.95
+        grid_confidence[in_range_indices] = new_conf
         
         # Update covered mask based on 95% threshold
         covered_mask = grid_confidence >= 0.95
@@ -345,24 +348,33 @@ def _save_animation(frames, constants, ugv_locs, beacon_locs, grid_points, filen
             ax.add_patch(plt.Circle((b[0], b[1]), constants["COVERAGE_RADIUS_BEACON"], color='green', fill=False, linestyle='--', alpha=0.3))
             
     # Dynamic elements
-    scat_uav = ax.scatter([], [], c='red', s=50, label='UAV')
-    scat_cov = ax.scatter([], [], c='gray', s=10, alpha=0.1) # Covered points
+    # Use scatter for coverage to "color the regions"
+    # We will update the color/alpha of grid points based on confidence
+    scat_cov = ax.scatter([], [], c=[], cmap='Greens', vmin=0, vmax=1, s=15, marker='s', alpha=0.5)
+    scat_uav = ax.scatter([], [], c='red', s=50, label='UAV', edgecolors='white')
+    
     title = ax.set_title("Time: 0.0 min")
     
     def update(frame):
         # Update UAVs
         scat_uav.set_offsets(frame["uav_pos"])
         
-        # Update Coverage (only show covered points)
-        covered_indices = np.where(frame["covered_mask"])[0]
-        if len(covered_indices) > 0:
-            pts = grid_points[covered_indices]
+        # Update Coverage
+        # frame["grid_confidence"] contains values 0..1
+        # We only want to plot points with some confidence to avoid clutter?
+        # Or plot all with color mapping.
+        conf = frame["grid_confidence"]
+        mask = conf > 0.01
+        if np.any(mask):
+            pts = grid_points[mask]
+            c_vals = conf[mask]
             scat_cov.set_offsets(pts)
+            scat_cov.set_array(c_vals)
         
         title.set_text(f"Time: {frame['time']/60.0:.1f} min")
         return scat_uav, scat_cov, title
         
-    anim = FuncAnimation(fig, update, frames=frames, interval=200, blit=True)
+    anim = FuncAnimation(fig, update, frames=frames, interval=200, blit=False)
     anim.save(filename, writer='pillow', fps=5)
     plt.close(fig)
     print("Animation saved.")
